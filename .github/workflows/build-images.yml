@@ -1,0 +1,65 @@
+name: Build Images
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-images.yml
+      - Config/**
+      - Dockerfiles/**
+      - Scripts/**
+      - Templates/**
+      - manage-all.sh
+
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/build-images.yml
+      - Config/**
+      - Dockerfiles/**
+      - Scripts/**
+      - Templates/**
+      - manage-all.sh
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  build-images:
+    name: Build Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Generate and build
+        run: ./manage-all.sh --generate --build
+
+  generate-workflow-summary:
+    name: Generate Workflow Summary
+    needs:
+      - build-images
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-summary.yml@master
+
+  generate-workflow-notifications:
+    name: Generate Workflow Notifications
+    needs:
+      - generate-workflow-summary
+    if: always()
+    uses: the-lupaxa-project/workflows/.github/workflows/reusable-workflow-notifier.yml@master
+    with:
+      notify_on_results: "failure,timed_out"
+    secrets:
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
